@@ -1,6 +1,7 @@
 import os
 from time import sleep
-from sso.ssh import PSSH
+from sso.ssh import PSSH, SSH
+from sso.cql import wait_for_cql_start
 
 
 def clear_cluster(cluster_public_ips, cluster_user, ssh_options, duration_seconds=90):
@@ -52,6 +53,8 @@ def nodes_stop(cluster_user, ssh_options, *public_ips):
 
 def nodes_start(cluster_user, ssh_options, *public_ips):
     print(f"Starting nodes {public_ips}")
-    pssh = PSSH(public_ips, cluster_user, ssh_options);
-    pssh.exec("sudo systemctl start scylla-server")
+    for public_ip in public_ips:
+        ssh = SSH(public_ip, cluster_user, ssh_options)
+        ssh.exec("sudo systemctl start scylla-server")
+        wait_for_cql_start(public_ip)
     print(f"Starting nodes {public_ips}: done")
