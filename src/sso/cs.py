@@ -12,8 +12,7 @@ class CassandraStress:
     def __init__(self, load_ips, properties, scylla_tools=True):
         self.properties = properties
         self.load_ips = load_ips
-        self.cassandra_version = properties['cassandra_version']
-        self.ssh_user = properties['load_generator_user']
+        self.ssh_user = properties['loadgenerator_user']
         self.scylla_tools = scylla_tools
 
     def __new_ssh(self, ip):
@@ -42,13 +41,14 @@ class CassandraStress:
                 fi
                 """)
         else:
+            cassandra_version = self.properties['cassandra_version']
             print(f'    [{ip}] Installing cassandra-stress (Cassandra): started')
             ssh.install_one('openjdk-8-jdk', 'java-1.8.0-openjdk')
             ssh.install('wget')
             ssh.exec(f"""
                 set -e
-                wget -q -N https://mirrors.netix.net/apache/cassandra/{self.cassandra_version}/apache-cassandra-{self.cassandra_version}-bin.tar.gz
-                tar -xzf apache-cassandra-{self.cassandra_version}-bin.tar.gz
+                wget -q -N https://mirrors.netix.net/apache/cassandra/{cassandra_version}/apache-cassandra-{cassandra_version}-bin.tar.gz
+                tar -xzf apache-cassandra-{cassandra_version}-bin.tar.gz
             """)
 
         print(f'    [{ip}] Installing cassandra-stress: done')
@@ -62,7 +62,8 @@ class CassandraStress:
         if self.scylla_tools:
             full_cmd = f'cassandra-stress {cmd}'
         else:
-            cassandra_stress_dir = f'apache-cassandra-{self.cassandra_version}/tools/bin'
+            cassandra_version = self.properties['cassandra_version']
+            cassandra_stress_dir = f'apache-cassandra-{cassandra_version}/tools/bin'
             full_cmd = f'{cassandra_stress_dir}/cassandra-stress {cmd}'
             
         dt=datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
