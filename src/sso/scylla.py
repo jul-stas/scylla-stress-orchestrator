@@ -3,58 +3,59 @@ from time import sleep
 from sso.ssh import PSSH, SSH
 from sso.cql import wait_for_cql_start
 
+import os
+import time
 
-def clear_cluster(cluster_public_ips, cluster_user, ssh_options, duration_seconds=90):
-    print("Shutting down cluster and removing all data")
-    pssh = PSSH(cluster_public_ips, cluster_user, ssh_options);
-    #pssh.exec("nodetool flush")
-    print("Stopping scylla")
-    pssh.exec("sudo systemctl stop scylla-server")
-    print("Removing data dir")
-    pssh.exec("sudo rm -fr /var/lib/scylla/data/*")
-    print("Removing commit log")
-    pssh.exec("sudo rm -fr /var/lib/scylla/commitlog/*")
-    print("Starting scylla")
-    pssh.exec("sudo systemctl start scylla-server")
-    print(f"Waiting {duration_seconds} seconds")
-    sleep(duration_seconds)
-    print("Cluster cleared and restarted")
+from datetime import datetime
+from sso.hdr import HdrLogProcessor
+from sso.ssh import SSH
+from sso.util import run_parallel, find_java, WorkerThread, log_important
 
-    
-def restart_cluster(cluster_public_ips, cluster_user, ssh_options, duration_seconds=90):
-    print("Restart cluster ")
-    pssh = PSSH(cluster_public_ips, cluster_user, ssh_options);
-    print("nodetool drain")
-    pssh.exec("nodetool drain")
-    print("sudo systemctl stop scylla-server")    
-    pssh.exec("sudo systemctl stop scylla-server")
-    print("sudo systemctl start scylla-server")    
-    pssh.exec("sudo systemctl start scylla-server")
-    print(f"Waiting {duration_seconds} seconds")
-    sleep(duration_seconds)
-    print("Cluster restarted")
+# Assumes Scylla was started from official Scylla AMI.
+class Scylla:
 
+    def __init__(self, cluster_public_ips, cluster_private_ips, seed_private_ip, properties):
+        self.properties = properties
+        self.cluster_public_ips = cluster_public_ips
+        self.cluster_private_ips = cluster_private_ips
+        self.seed_private_ip = seed_private_ip
+        self.ssh_user = properties['cluster_user']
+  
+    def __new_ssh(self, ip):
+        return SSH(ip, self.ssh_user, self.properties['ssh_options'])
 
-def nodes_remove_data(cluster_user, ssh_options, *public_ips):
-    print(f"Removing data from nodes {public_ips}")
-    pssh = PSSH(public_ips, cluster_user, ssh_options);
-    pssh.exec("sudo rm -fr /var/lib/scylla/data/*")
-    pssh.exec("sudo rm -fr /var/lib/scylla/commitlog/*")
-    print(f"Removing data from nodes {public_ips}: done")
+    def __install(self, ip):
+        ssh = self.__new_ssh(ip)
 
+        # Scylla AMI automatically performs setup
+        # and then starts up. Each node is a separate 1-node cluster.
+        # Here, we wait for this startup.
+        wait_for_cql_start(ip)
 
-def nodes_stop(cluster_user, ssh_options, *public_ips):
-    print(f"Stopping nodes {public_ips}")
-    pssh = PSSH(public_ips, cluster_user, ssh_options);
-    pssh.exec("nodetool flush")
-    pssh.exec("sudo systemctl stop scylla-server")
-    print(f"Stopping nodes {public_ips}: done")
+        # Scylla started. Now we stop it and wipe
+        # the data it generated.
 
+        # FIXME - stop scylla-server more forcefully?
+        ssh.exec("sudo systemctl stop scylla-server")
+        ssh.exec("sudo rm -rf /var/lib/scylla/data/*")
+        ssh.exec("sudo rm -rf /var/lib/scylla/commitlog/*")
 
-def nodes_start(cluster_user, ssh_options, *public_ips):
-    print(f"Starting nodes {public_ips}")
-    for public_ip in public_ips:
-        ssh = SSH(public_ip, cluster_user, ssh_options)
-        ssh.exec("sudo systemctl start scylla-server")
-        wait_for_cql_start(public_ip)
-    print(f"Starting nodes {public_ips}: done")
+        # Patch configuration files
+        ssh.exec("sudo sed -i \"s/cluster_name:.*/cluster_name: cluster1/g\" /etc/scylla/scylla.yaml")
+        ssh.exec(f'sudo sed -i \"s/seeds:.*/seeds: {self.seed_private_ip} /g\" /etc/scylla/scylla.yaml')
+
+    def install(self):
+        log_important("Installing Scylla: started")
+        run_parallel(self.__install, [(ip,) for ip in self.cluster_public_ips])
+        log_important("Installing Scylla: done")
+        
+    def start(self):
+        print(f"Starting Scylla nodes {self.cluster_public_ips}")
+        for public_ip in self.cluster_public_ips:
+            ssh = self.__new_ssh(public_ip)
+            ssh.exec("sudo systemctl start scylla-server")
+            wait_for_cql_start(public_ip)
+        print(f"Starting Scylla nodes {self.cluster_public_ips}: done")
+
+    def stop(self):
+        print("Not implemented!")
