@@ -7,13 +7,10 @@ sys.path.insert(1, f"{os.environ['SSO']}/src/")
 import yaml
 from sso import terraform
 
-if len(sys.argv) == 1:
-    with open('properties.yml') as f:
-        properties = yaml.load(f, Loader=yaml.FullLoader)
-    terraform_plan = properties.get('terraform_plan')
-    if not terraform_plan:
-        raise Exception("Could not find 'terraform_plan' in properties.yml")
+if len(sys.argv) < 3:
+	raise Exception("provision-terraform TERRAFORM_PLAN PROFILE_NAME")
 else:
     terraform_plan = sys.argv[1]
+    profile_name = sys.argv[2]
 
-terraform.apply(terraform_plan)
+terraform.apply(terraform_plan, profile_name)
