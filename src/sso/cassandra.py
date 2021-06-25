@@ -5,14 +5,16 @@ import time
 from datetime import datetime
 from sso.hdr import HdrLogProcessor
 from sso.ssh import SSH
+from sso.cql import wait_for_cql_start
 from sso.util import run_parallel, find_java, WorkerThread, log_important
 
 class Cassandra:
 
-    def __init__(self, cluster_public_ips, cluster_private_ips, properties, cassandra_version=None):
+    def __init__(self, cluster_public_ips, cluster_private_ips, seed_private_ip, properties, cassandra_version=None):
         self.properties = properties
         self.cluster_public_ips = cluster_public_ips
         self.cluster_private_ips = cluster_private_ips
+        self.seed_private_ip = seed_private_ip
         if cassandra_version is not None:
             self.cassandra_version = cassandra_version
         else:
@@ -31,7 +33,6 @@ class Cassandra:
         print(f'    [{ip}] Installing Cassandra: started')
         ssh.install_one('openjdk-8-jdk', 'java-1.8.0-openjdk')
         ssh.install('wget')
-        seeds = ",".join(self.cluster_private_ips)
         private_ip = self.__find_private_ip(ip)
         ssh.exec(f"""
             set -e
@@ -44,7 +45,7 @@ class Cassandra:
             wget -q -N https://mirrors.netix.net/apache/cassandra/{self.cassandra_version}/apache-cassandra-{self.cassandra_version}-bin.tar.gz
             tar -xzf apache-cassandra-{self.cassandra_version}-bin.tar.gz
             cd apache-cassandra-{self.cassandra_version}
-            sudo sed -i \"s/seeds:.*/seeds: {seeds} /g\" conf/cassandra.yaml
+            sudo sed -i \"s/seeds:.*/seeds: {self.seed_private_ip} /g\" conf/cassandra.yaml
             sudo sed -i \"s/listen_address:.*/listen_address: {private_ip} /g\" conf/cassandra.yaml
             sudo sed -i \"s/rpc_address:.*/rpc_address: {private_ip} /g\" conf/cassandra.yaml
         """)
@@ -68,16 +69,21 @@ class Cassandra:
             if [ -f 'cassandra.pid' ]; then
                 pid=$(cat cassandra.pid)
                 kill $pid
-                rm 'cassandra.pid'
+                while kill -0 $pid; do 
+                    sleep 1
+                done
+                rm -f 'cassandra.pid'
             fi
             bin/cassandra -p cassandra.pid 2>&1 >> cassandra.out & 
             """)
         print(f'    [{ip}] Starting Cassandra: done')
 
     def start(self):
-        log_important("Start Cassandra: started")
-        run_parallel(self.__start, [(ip,) for ip in self.cluster_public_ips])
-        log_important("Start Cassandra: done")
+        print(f"Starting Cassandra nodes {self.cluster_public_ips}")
+        for public_ip in self.cluster_public_ips:
+            self.__start(public_ip)
+            wait_for_cql_start(public_ip)
+        print(f"Starting Cassandra nodes {self.cluster_public_ips}: done")
         
     def __stop(self, ip):
         print(f'    [{ip}] Stopping Cassandra: started')
@@ -88,7 +94,10 @@ class Cassandra:
             if [ -f 'cassandra.pid' ]; then
                 pid=$(cat cassandra.pid)
                 kill $pid
-                rm 'cassandra.pid'
+                while kill -0 $pid; do 
+                    sleep 1
+                done
+                rm -f 'cassandra.pid'
             fi
             """)
         print(f'    [{ip}] Stopping Cassandra: done')
