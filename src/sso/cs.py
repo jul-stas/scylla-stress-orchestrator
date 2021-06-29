@@ -80,6 +80,25 @@ class CassandraStress:
             print("using load_index " + str(load_index))
             self.__stress(self.load_ips[load_index], command)
 
+    def stress_seq_range(self, row_count, command_part1, command_part2):
+        load_ip_count = len(self.load_ips)
+        row_count_per_ip = row_count // load_ip_count
+        range_points = [1]
+        for i in range(load_ip_count):
+            range_points.append(range_points[-1] + row_count_per_ip)
+        range_points[-1] = row_count
+
+        population_commands = []
+        # FIXME - cleanup
+        for i in range(len(range_points) - 1):
+            population_commands.append(f' n={range_points[i + 1] - range_points[i] + 1} -pop seq={range_points[i]}..{range_points[i + 1]} ')
+
+        print(population_commands)
+
+        log_important("Cassandra-Stress: started")
+        run_parallel(self.__stress, [(ip, command_part1 + pop_command + command_part2) for ip, pop_command in zip(self.load_ips, population_commands)])
+        log_important("Cassandra-Stress: done")
+
     def async_stress(self, command, load_index=None):
         thread = WorkerThread(self.stress, (command, load_index))
         thread.start()
