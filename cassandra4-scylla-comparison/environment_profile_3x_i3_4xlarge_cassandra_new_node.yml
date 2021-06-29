@@ -1,0 +1,19 @@
+cluster_private_ips:
+- 172.31.38.75
+- 172.31.33.143
+- 172.31.36.189
+- 172.31.41.244
+cluster_public_ips:
+- 18.224.27.237
+- 3.16.114.223
+- 18.118.101.117
+- 18.188.101.193
+deployment_id: 4bb3a9cd2ebf9eda
+loadgenerator_private_ips:
+- 172.31.38.20
+- 172.31.34.153
+loadgenerator_public_ips:
+- 13.59.247.81
+- 18.216.183.249
+prometheus_public_ip:
+- 13.59.39.195
