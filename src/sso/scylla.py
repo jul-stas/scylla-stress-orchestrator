@@ -8,7 +8,7 @@ import time
 
 from datetime import datetime
 from sso.hdr import HdrLogProcessor
-from sso.ssh import SSH
+from sso.ssh import SSH, PSSH
 from sso.util import run_parallel, find_java, WorkerThread, log_important
 
 # Assumes Scylla was started from official Scylla AMI.
@@ -43,12 +43,20 @@ class Scylla:
         # Patch configuration files
         ssh.exec("sudo sed -i \"s/cluster_name:.*/cluster_name: cluster1/g\" /etc/scylla/scylla.yaml")
         ssh.exec(f'sudo sed -i \"s/seeds:.*/seeds: {self.seed_private_ip} /g\" /etc/scylla/scylla.yaml')
+        ssh.exec("sudo sh -c \"echo 'compaction_static_shares: 100' >> /etc/scylla/scylla.yaml\"")
+        ssh.exec("sudo sh -c \"echo 'compaction_enforce_min_threshold: true' >> /etc/scylla/scylla.yaml\"")
+
 
     def install(self):
         log_important("Installing Scylla: started")
         run_parallel(self.__install, [(ip,) for ip in self.cluster_public_ips])
         log_important("Installing Scylla: done")
         
+    def append_configuration(self, configuration):
+        print(f"Appending configuration to nodes {self.cluster_public_ips}: {configuration}")
+        pssh = PSSH(self.cluster_public_ips, self.ssh_user, self.properties['ssh_options'])
+        pssh.exec(f"sudo sh -c \"echo '{configuration}' >> /etc/scylla/scylla.yaml\"")
+
     def start(self):
         print(f"Starting Scylla nodes {self.cluster_public_ips}")
         for public_ip in self.cluster_public_ips:
@@ -57,5 +65,21 @@ class Scylla:
             wait_for_cql_start(public_ip)
         print(f"Starting Scylla nodes {self.cluster_public_ips}: done")
 
-    def stop(self):
-        print("Not implemented!")
+    def nodetool(self, command, load_index=None):
+        if load_index is None:
+            run_parallel(self.nodetool, [(command, i) for i in range(len(self.cluster_private_ips))])
+        else:
+            ssh = self.__new_ssh(self.cluster_public_ips[load_index])
+            ssh.exec(f"nodetool {command}")
+
+    def stop(self, load_index=None, erase_data=False):
+        if load_index is None:
+            print("Not implemented!")
+        else:
+            self.nodetool("drain", load_index=load_index)
+            ssh = self.__new_ssh(self.cluster_public_ips[load_index])
+            ssh.exec("sudo systemctl stop scylla-server")
+
+            if erase_data:
+                ssh.exec("sudo rm -rf /var/lib/scylla/data/*")
+                ssh.exec("sudo rm -rf /var/lib/scylla/commitlog/*")
