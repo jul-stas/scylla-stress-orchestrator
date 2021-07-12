@@ -34,8 +34,8 @@ loadgenerator_count = len(loadgenerator_public_ips)
 # Measured experimentally.
 ROW_SIZE_BYTES = 210 * 1024 * 1024 * 1024 / 720_000_000
 
-# 100GB per node
-TARGET_DATASET_SIZE = len(cluster_private_ips) * 100 * 1024 * 1024 * 1024
+# 200GB per node
+TARGET_DATASET_SIZE = len(cluster_private_ips) * 200 * 1024 * 1024 * 1024
 
 REPLICATION_FACTOR = 3
 ROW_COUNT = int(TARGET_DATASET_SIZE / ROW_SIZE_BYTES / REPLICATION_FACTOR)
@@ -43,7 +43,10 @@ ROW_COUNT = int(TARGET_DATASET_SIZE / ROW_SIZE_BYTES / REPLICATION_FACTOR)
 START_RATE     = 10000
 RATE_INCREMENT = 10000
 
-MAX_99_PERCENTILE_LATENCY = 10.0
+MAX_90_PERCENTILE_LATENCY = 1000.0
+
+WRITE_COUNT = props['write_count']
+READ_COUNT = props['read_count']
 
 # Start Scylla/Cassandra nodes
 if props['cluster_type'] == 'scylla':
@@ -72,21 +75,29 @@ rate = START_RATE
 while True:
     print("Run iteration started at:", datetime.now().strftime("%H:%M:%S"))
 
-    iteration = Iteration(f'{env["deployment_id"]}/cassandra-stress-{rate}', ignore_git=True)
+    iteration = Iteration(f'{profile_name}/cassandra-stress-{rate}', ignore_git=True)
 
-    cs.stress(f'mixed ratio\\(write=1,read=1\\) duration=15m cl=QUORUM -pop dist=UNIFORM\\(1..{ROW_COUNT}\\) -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=100 fixed={rate // loadgenerator_count}/s" -node {cluster_string}')
+    cs.stress(f'mixed ratio\\(write={WRITE_COUNT},read={READ_COUNT}\\) duration=15m cl=QUORUM -pop dist=UNIFORM\\(1..{ROW_COUNT}\\) -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=100 fixed={rate // loadgenerator_count}/s" -node {cluster_string}')
 
     cs.collect_results(iteration.dir)
 
-    write_profile_summary = parse_profile_summary_file(f'{iteration.dir}/profile-summary.txt', 'WRITE')
-    print('WRITE_PROFILE', write_profile_summary)
+    if WRITE_COUNT > 0:
+        write_profile_summary = parse_profile_summary_file(f'{iteration.dir}/profile-summary.txt', 'WRITE')
+        print('WRITE_PROFILE', write_profile_summary)
 
-    read_profile_summary = parse_profile_summary_file(f'{iteration.dir}/profile-summary.txt', 'READ')
-    print('READ_PROFILE', read_profile_summary)
+    if READ_COUNT > 0:
+        read_profile_summary = parse_profile_summary_file(f'{iteration.dir}/profile-summary.txt', 'READ')
+        print('READ_PROFILE', read_profile_summary)
 
-    if write_profile_summary.p99_latency_ms > MAX_99_PERCENTILE_LATENCY:
+    with open(f'{iteration.dir}/parsed_profile_summary_file.txt', 'a') as writer:
+        if WRITE_COUNT > 0:
+            writer.write(f'WRITE_PROFILE: {write_profile_summary}\n')
+        if READ_COUNT > 0:
+            writer.write(f'READ_PROFILE: {read_profile_summary}\n')
+
+    if WRITE_COUNT > 0 and write_profile_summary.p90_latency_ms > MAX_90_PERCENTILE_LATENCY:
         break
-    if read_profile_summary.p99_latency_ms > MAX_99_PERCENTILE_LATENCY:
+    if READ_COUNT > 0 and read_profile_summary.p90_latency_ms > MAX_90_PERCENTILE_LATENCY:
         break
 
     rate += RATE_INCREMENT
