@@ -2,7 +2,7 @@ import os
 import subprocess
 import time
 from sso.util import run_parallel
-
+import shlex
 
 # Parallel SSH
 class PSSH:
@@ -108,7 +108,7 @@ class SSH:
     def exec(self, command):
         self.__wait_for_connect()
 
-        cmd = f'ssh {self.ssh_options} {self.user}@{self.ip} \'{command}\''
+        cmd = f'ssh {self.ssh_options} {self.user}@{self.ip} {shlex.quote(command)}'
         exitcode = subprocess.call(cmd, shell=True)
         if exitcode == 0 or exitcode == 1:  # todo: we need to deal better with exit code
             return
