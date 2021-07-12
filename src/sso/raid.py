@@ -15,7 +15,7 @@ class RAID:
         pssh = PSSH(self.public_ips, self.user, self.properties['ssh_options'])
         pssh.exec(f"""
             if [[ ! -b /dev/md/{self.raid_device_name} ]]; then
-                sudo mdadm --create --verbose /dev/md/{self.raid_device_name} --level={self.level} --raid-devices=$(ls {self.device_name_wildcard} | wc -l) {self.device_name_wildcard}
+                sudo mdadm --create --verbose /dev/md/{self.raid_device_name} --chunk=256 --metadata=1.2 --level={self.level} --raid-devices=$(ls {self.device_name_wildcard} | wc -l) {self.device_name_wildcard}
                 
                 # /dev/md/raid_device_name maps to /dev/md[0-9]+
                 MD_NAME=$(basename $(readlink /dev/md/{self.raid_device_name}))
@@ -23,6 +23,7 @@ class RAID:
                 # Tuning
                 sudo sh -c "echo 1 > /sys/block/$MD_NAME/queue/nomerges"
                 sudo sh -c "echo 8 > /sys/block/$MD_NAME/queue/read_ahead_kb"
+                sudo sh -c "echo none > /sys/block/$MD_NAME/queue/scheduler"
 
                 sudo mkfs.xfs -f /dev/$MD_NAME
                 mkdir {self.raid_device_name}
