@@ -2,7 +2,7 @@ region: us-east-2
 availability_zone: us-east-2c
 
 cluster_type: scylla
-cluster_size: 4
+cluster_size: 6
 cluster_instance_type: i3.4xlarge
 cluster_user: centos
 

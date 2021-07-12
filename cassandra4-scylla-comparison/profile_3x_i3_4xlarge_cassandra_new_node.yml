@@ -8,7 +8,7 @@ cluster_type: cassandra
 # Ubuntu 20.04 LTS
 cluster_user: ubuntu
 cluster_ami: ami-06382629a9eb569e3
-cassandra_version: 4.0-rc1
+cassandra_version: 4.0-rc2
 
 prometheus_instance_type: c5.large
 prometheus_ami: ami-0dd9f0e7df0f0a138
@@ -19,3 +19,6 @@ loadgenerator_ami: ami-0996d3051b72b5b2c
 loadgenerator_user: ubuntu
 
 ssh_options: -i key -o StrictHostKeyChecking=no -o ConnectTimeout=60
+
+# Benchmark-specific configuration
+start_count: 3
