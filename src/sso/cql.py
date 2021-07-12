@@ -2,7 +2,7 @@ from time import sleep
 from datetime import datetime, timedelta
 import socket
 
-def wait_for_cql_start(node_ip, timeout=600, connect_timeout=10, max_tries_per_second=2):
+def wait_for_cql_start(node_ip, timeout=7200, connect_timeout=10, max_tries_per_second=2):
     print(f'    [{node_ip}] Waiting for CQL port to start (meaning node bootstrap finished). This could take a while.')
 
     backoff_interval = 1.0 / max_tries_per_second
