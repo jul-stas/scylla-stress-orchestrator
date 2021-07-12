@@ -4,8 +4,8 @@ import time
 from datetime import datetime
 from sso.hdr import HdrLogProcessor
 from sso.ssh import SSH
-from sso.util import run_parallel, WorkerThread,log_important
-
+from sso.util import run_parallel, WorkerThread, WorkerThreadLoop, log_important
+from time import sleep
 
 class CassandraStress:
 
@@ -58,7 +58,9 @@ class CassandraStress:
         run_parallel(self.__install, [(ip,) for ip in self.load_ips])
         log_important("Installing Cassandra-Stress: done")
 
-    def __stress(self, ip, cmd):
+    def __stress(self, ip, startup_delay, cmd):
+        sleep(startup_delay)
+
         if self.scylla_tools:
             full_cmd = f'cassandra-stress {cmd}'
         else:
@@ -74,11 +76,11 @@ class CassandraStress:
     def stress(self, command, load_index=None):
         if load_index is None:
             log_important("Cassandra-Stress: started")
-            run_parallel(self.__stress, [(ip, command) for ip in self.load_ips])
+            run_parallel(self.__stress, [(ip, 10 if i > 0 else 0, command) for i, ip in enumerate(self.load_ips)])
             log_important("Cassandra-Stress: done")
         else:
             print("using load_index " + str(load_index))
-            self.__stress(self.load_ips[load_index], command)
+            self.__stress(self.load_ips[load_index], 0, command)
 
     def stress_seq_range(self, row_count, command_part1, command_part2):
         load_ip_count = len(self.load_ips)
@@ -96,13 +98,18 @@ class CassandraStress:
         print(population_commands)
 
         log_important("Cassandra-Stress: started")
-        run_parallel(self.__stress, [(ip, command_part1 + pop_command + command_part2) for ip, pop_command in zip(self.load_ips, population_commands)])
+        run_parallel(self.__stress, [(ip, 10 if i > 0 else 0, command_part1 + pop_command + command_part2) for i, (ip, pop_command) in enumerate(zip(self.load_ips, population_commands))])
         log_important("Cassandra-Stress: done")
 
     def async_stress(self, command, load_index=None):
         thread = WorkerThread(self.stress, (command, load_index))
         thread.start()
         return thread.future
+
+    def loop_stress(self, command, load_index=None):
+        thread = WorkerThreadLoop(self.stress, (command, load_index))
+        thread.start()
+        return thread
 
     def insert(self, profile, item_count, nodes, mode="native cql3", rate="threads=100", sequence_start=None):
         log_important(f"Inserting {item_count} items")
