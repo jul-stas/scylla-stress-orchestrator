@@ -4,7 +4,7 @@ import time
 
 from datetime import datetime
 from sso.hdr import HdrLogProcessor
-from sso.ssh import SSH
+from sso.ssh import SSH, PSSH
 from sso.cql import wait_for_cql_start
 from sso.util import run_parallel, find_java, WorkerThread, log_important
 from sso.raid import RAID
@@ -33,7 +33,7 @@ class Cassandra:
         ssh = self.__new_ssh(ip)
         ssh.update()
         print(f'    [{ip}] Installing Cassandra: started')
-        ssh.install_one('openjdk-11-jdk', 'java-11-openjdk')
+        ssh.install_one('openjdk-16-jdk', 'java-16-openjdk')
         ssh.install('wget')
         private_ip = self.__find_private_ip(ip)
         path_prefix = 'cassandra-raid/' if self.setup_raid else './'
@@ -47,6 +47,14 @@ class Cassandra:
             
             wget -q -N https://mirrors.netix.net/apache/cassandra/{self.cassandra_version}/apache-cassandra-{self.cassandra_version}-bin.tar.gz
             tar -xzf apache-cassandra-{self.cassandra_version}-bin.tar.gz -C {path_prefix}
+        """)
+        ssh.scp_to_remote("jvm11-server.options", f"{path_prefix}apache-cassandra-{self.cassandra_version}/conf/jvm11-server.options")
+        ssh.scp_to_remote("cassandra.yaml", f"{path_prefix}apache-cassandra-{self.cassandra_version}/conf/cassandra.yaml")
+        # FIXME - heap in MB * 2
+        ssh.exec("""
+            sudo sh -c "echo 262144 > /proc/sys/vm/max_map_count"
+        """)
+        ssh.exec(f"""
             cd {path_prefix}apache-cassandra-{self.cassandra_version}
             sudo sed -i \"s/seeds:.*/seeds: {self.seed_private_ip} /g\" conf/cassandra.yaml
             sudo sed -i \"s/listen_address:.*/listen_address: {private_ip} /g\" conf/cassandra.yaml
@@ -57,6 +65,14 @@ class Cassandra:
     def __find_private_ip(self, public_ip):
         index = self.cluster_public_ips.index(public_ip)
         return self.cluster_private_ips[index]
+
+    def nodetool(self, command, load_index=None):
+        if load_index is None:
+            run_parallel(self.nodetool, [(command, i) for i in range(len(self.cluster_private_ips))])
+        else:
+            path_prefix = 'cassandra-raid/' if self.setup_raid else './'
+            ssh = self.__new_ssh(self.cluster_public_ips[load_index])
+            ssh.exec(f"{path_prefix}apache-cassandra-{self.cassandra_version}/bin/nodetool {command}")
 
     def install(self):
         log_important("Installing Cassandra: started")
@@ -77,7 +93,7 @@ class Cassandra:
             cd {path_prefix}apache-cassandra-{self.cassandra_version}
             if [ -f 'cassandra.pid' ]; then
                 pid=$(cat cassandra.pid)
-                kill $pid
+                kill $pid || true
                 while kill -0 $pid; do 
                     sleep 1
                 done
@@ -86,6 +102,13 @@ class Cassandra:
             bin/cassandra -p cassandra.pid 2>&1 >> cassandra.out & 
             """)
         print(f'    [{ip}] Starting Cassandra: done')
+
+    def append_env_configuration(self, configuration):
+        print(f"Appending cassandra-env.sh configuration to nodes {self.cluster_public_ips}: {configuration}")
+        pssh = PSSH(self.cluster_public_ips, self.ssh_user, self.properties['ssh_options'])
+        path_prefix = 'cassandra-raid/' if self.setup_raid else './'
+        pssh.exec(f"echo '{configuration}' >> {path_prefix}apache-cassandra-{self.cassandra_version}/conf/cassandra-env.sh")
+        print(f"echo '{configuration}' >> {path_prefix}apache-cassandra-{self.cassandra_version}/conf/cassandra-env.sh")
 
     def start(self):
         print(f"Starting Cassandra nodes {self.cluster_public_ips}")
@@ -103,7 +126,7 @@ class Cassandra:
             cd {path_prefix}apache-cassandra-{self.cassandra_version}
             if [ -f 'cassandra.pid' ]; then
                 pid=$(cat cassandra.pid)
-                kill $pid
+                kill $pid || true
                 while kill -0 $pid; do 
                     sleep 1
                 done
@@ -112,7 +135,15 @@ class Cassandra:
             """)
         print(f'    [{ip}] Stopping Cassandra: done')
 
-    def stop(self):
-        log_important("Stop Cassandra: started")
-        run_parallel(self.__stop, [(ip,) for ip in self.cluster_public_ips])
-        log_important("Stop Cassandra: done")    
+    def stop(self, load_index=None, erase_data=False):
+        if load_index is None:
+            log_important("Stop Cassandra: started")
+            run_parallel(self.__stop, [(ip,) for ip in self.cluster_public_ips])
+            log_important("Stop Cassandra: done")
+        else:
+            self.__stop(self.cluster_public_ips[load_index])
+
+            if erase_data:
+                ssh = self.__new_ssh(self.cluster_public_ips[load_index])
+                path_prefix = 'cassandra-raid/' if self.setup_raid else './'
+                ssh.exec(f"rm -rf {path_prefix}apache-cassandra-{self.cassandra_version}/data")
