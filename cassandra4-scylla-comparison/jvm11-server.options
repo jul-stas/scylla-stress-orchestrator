@@ -37,6 +37,8 @@
 --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED
 --add-exports=java.rmi/sun.rmi.server=ALL-UNNAMED
 --add-exports=java.sql/java.sql=ALL-UNNAMED
+--add-exports=java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED
+--add-exports=java.management/com.sun.jmx.interceptor=ALL-UNNAMED
 
 --add-exports=java.base/sun.nio.ch=ALL-UNNAMED
 --add-opens=java.base/sun.nio.ch=ALL-UNNAMED

@@ -2,6 +2,7 @@
 
 import sys
 import os
+import time
 
 sys.path.insert(1, f"{os.environ['SSO']}/src/")
 
@@ -34,10 +35,11 @@ loadgenerator_count = len(loadgenerator_public_ips)
 # Measured experimentally.
 ROW_SIZE_BYTES = 210 * 1024 * 1024 * 1024 / 720_000_000
 
-# 200GB per node
-TARGET_DATASET_SIZE = len(cluster_private_ips) * 200 * 1024 * 1024 * 1024
+# 1TB per node
+TARGET_DATASET_SIZE = len(cluster_private_ips) * 1024 * 1024 * 1024 * 1024
 
 REPLICATION_FACTOR = 3
+COMPACTION_STRATEGY = props['compaction_strategy']
 ROW_COUNT = int(TARGET_DATASET_SIZE / ROW_SIZE_BYTES / REPLICATION_FACTOR)
 
 START_RATE     = 10000
@@ -66,7 +68,10 @@ cs.prepare()
 
 print("Loading started at:", datetime.now().strftime("%H:%M:%S"))
 
-cs.stress_seq_range(ROW_COUNT, 'write cl=QUORUM', f'-schema "replication(strategy=SimpleStrategy,replication_factor={REPLICATION_FACTOR})" -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=30" -node {cluster_string}')
+cs.stress_seq_range(ROW_COUNT, 'write cl=QUORUM', f'-schema "replication(strategy=SimpleStrategy,replication_factor={REPLICATION_FACTOR})" "compaction(strategy={COMPACTION_STRATEGY})" -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=700 throttle=33000/s" -node {cluster_string}')
+
+print("Sleeping 2h")
+time.sleep(60 * 60 * 2)
 
 print("Run started at:", datetime.now().strftime("%H:%M:%S"))
 
@@ -77,7 +82,7 @@ while True:
 
     iteration = Iteration(f'{profile_name}/cassandra-stress-{rate}', ignore_git=True)
 
-    cs.stress(f'mixed ratio\\(write={WRITE_COUNT},read={READ_COUNT}\\) duration=15m cl=QUORUM -pop dist=UNIFORM\\(1..{ROW_COUNT}\\) -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=100 fixed={rate // loadgenerator_count}/s" -node {cluster_string}')
+    cs.stress(f'mixed ratio\\(write={WRITE_COUNT},read={READ_COUNT}\\) duration=30m cl=QUORUM -pop dist=UNIFORM\\(1..{ROW_COUNT}\\) -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=700 fixed={rate // loadgenerator_count}/s" -node {cluster_string}')
 
     cs.collect_results(iteration.dir)
 

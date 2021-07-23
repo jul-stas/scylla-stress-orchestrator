@@ -2,6 +2,7 @@
 
 import sys
 import os
+import time
 
 sys.path.insert(1, f"{os.environ['SSO']}/src/")
 
@@ -34,10 +35,11 @@ loadgenerator_count = len(loadgenerator_public_ips)
 # Measured experimentally.
 ROW_SIZE_BYTES = 210 * 1024 * 1024 * 1024 / 720_000_000
 
-# 5GB per node
-TARGET_DATASET_SIZE = len(cluster_private_ips) * 50 * 1024 * 1024 * 1024
+# 1TB per node
+TARGET_DATASET_SIZE = len(cluster_private_ips) * 1024 * 1024 * 1024 * 1024
 
 REPLICATION_FACTOR = 3
+COMPACTION_STRATEGY = props['compaction_strategy']
 ROW_COUNT = int(TARGET_DATASET_SIZE / ROW_SIZE_BYTES / REPLICATION_FACTOR)
 
 # Start Scylla/Cassandra nodes
@@ -58,21 +60,24 @@ cs.prepare()
 
 print("Loading started at:", datetime.now().strftime("%H:%M:%S"))
 
-cs.stress_seq_range(ROW_COUNT, 'write cl=QUORUM', f'-schema "replication(strategy=SimpleStrategy,replication_factor={REPLICATION_FACTOR})" -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=200 throttle=40000/s" -node {cluster_string}')
+cs.stress_seq_range(ROW_COUNT, 'write cl=QUORUM', f'-schema "replication(strategy=SimpleStrategy,replication_factor={REPLICATION_FACTOR})" "compaction(strategy={COMPACTION_STRATEGY})" -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=700 throttle=33000/s" -node {cluster_string}')
 
-# print("Run started at:", datetime.now().strftime("%H:%M:%S"))
+print("Sleeping 2h")
+time.sleep(60 * 60 * 2)
 
-# iteration = Iteration(f'{profile_name}/repair_no_errors', ignore_git=True)
+print("Run started at:", datetime.now().strftime("%H:%M:%S"))
 
-# repair_start = datetime.now()
+iteration = Iteration(f'{profile_name}/repair_no_errors', ignore_git=True)
 
-# print("Reparing node 0 started at:", datetime.now().strftime("%H:%M:%S"))
-# cluster.nodetool("repair -full", 0)
-# print("Reparing node 0 ended at:", datetime.now().strftime("%H:%M:%S"))
+repair_start = datetime.now()
 
-# repair_end = datetime.now()
+print("Reparing node 0 started at:", datetime.now().strftime("%H:%M:%S"))
+cluster.nodetool("repair -full", 0)
+print("Reparing node 0 ended at:", datetime.now().strftime("%H:%M:%S"))
 
-# with open(f'{iteration.dir}/result.txt', 'a') as writer:
-#     writer.write(f'Reparing node 0 took (s): {(repair_end - repair_start).total_seconds()}\n')
+repair_end = datetime.now()
 
-# print("Run ended at:", datetime.now().strftime("%H:%M:%S"))
+with open(f'{iteration.dir}/result.txt', 'a') as writer:
+    writer.write(f'Reparing node 0 took (s): {(repair_end - repair_start).total_seconds()}\n')
+
+print("Run ended at:", datetime.now().strftime("%H:%M:%S"))

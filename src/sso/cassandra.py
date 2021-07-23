@@ -47,9 +47,12 @@ class Cassandra:
             
             wget -q -N https://mirrors.netix.net/apache/cassandra/{self.cassandra_version}/apache-cassandra-{self.cassandra_version}-bin.tar.gz
             tar -xzf apache-cassandra-{self.cassandra_version}-bin.tar.gz -C {path_prefix}
+            
+            wget -q https://github.com/criteo/cassandra_exporter/releases/download/2.3.5/cassandra_exporter-2.3.5.jar
         """)
         ssh.scp_to_remote("jvm11-server.options", f"{path_prefix}apache-cassandra-{self.cassandra_version}/conf/jvm11-server.options")
         ssh.scp_to_remote("cassandra.yaml", f"{path_prefix}apache-cassandra-{self.cassandra_version}/conf/cassandra.yaml")
+        ssh.scp_to_remote("cassandra-exporter.yml", f"config.yml")
         # FIXME - heap in MB * 2
         ssh.exec("""
             sudo sh -c "echo 262144 > /proc/sys/vm/max_map_count"
@@ -99,9 +102,17 @@ class Cassandra:
                 done
                 rm -f 'cassandra.pid'
             fi
-            bin/cassandra -p cassandra.pid 2>&1 >> cassandra.out & 
+            bin/cassandra -p cassandra.pid 2>&1 >> cassandra.out &
             """)
         print(f'    [{ip}] Starting Cassandra: done')
+    
+    def __start_exporter(self, ip):
+        print(f'    [{ip}] Starting exporter')
+        ssh = self.__new_ssh(ip)
+        ssh.exec(f"""
+            java -Dorg.slf4j.simpleLogger.defaultLogLevel=trace -jar ~/cassandra_exporter-2.3.5.jar ~/config.yml >> ~/cassandra_exporter.out 2>&1 &
+            """)
+        print(f'    [{ip}] Starting exporter: done')
 
     def append_env_configuration(self, configuration):
         print(f"Appending cassandra-env.sh configuration to nodes {self.cluster_public_ips}: {configuration}")
@@ -115,6 +126,7 @@ class Cassandra:
         for public_ip in self.cluster_public_ips:
             self.__start(public_ip)
             wait_for_cql_start(public_ip)
+            self.__start_exporter(public_ip)
         print(f"Starting Cassandra nodes {self.cluster_public_ips}: done")
         
     def __stop(self, ip):

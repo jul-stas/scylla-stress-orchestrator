@@ -20,6 +20,9 @@ loadgenerator_user: ubuntu
 
 ssh_options: -i key -o StrictHostKeyChecking=no -o ConnectTimeout=60
 
-compaction_strategy: SizeTieredCompactionStrategy
+write_count: 0
+read_count: 1
+
+compaction_strategy: LeveledCompactionStrategy
 
 prometheus_user: ubuntu

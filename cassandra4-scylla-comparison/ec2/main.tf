@@ -253,6 +253,8 @@ resource "aws_instance" "prometheus" {
     inline = [
       "sudo apt-get -y -q update",
       "sudo apt-get -y install -q docker.io",
+      "sudo apt-get -y -q update",
+      "sudo apt-get -y install -q docker.io",
       "sudo usermod -aG docker $USER",
       "sudo systemctl enable docker",
       "wget -q https://github.com/scylladb/scylla-monitoring/archive/scylla-monitoring-3.6.3.tar.gz",

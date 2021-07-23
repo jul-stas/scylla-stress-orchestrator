@@ -19,3 +19,8 @@ loadgenerator_user: ubuntu
 
 ssh_options: -i key -o StrictHostKeyChecking=no -o ConnectTimeout=60
 cassandra_version: 3.11.10
+
+compaction_strategy: SizeTieredCompactionStrategy
+prometheus_user: ubuntu
+
+prometheus_user: ubuntu

@@ -19,3 +19,7 @@ loadgenerator_ami: ami-0996d3051b72b5b2c
 loadgenerator_user: ubuntu
 
 ssh_options: -i key -o StrictHostKeyChecking=no -o ConnectTimeout=60
+
+compaction_strategy: SizeTieredCompactionStrategy
+
+prometheus_user: ubuntu
