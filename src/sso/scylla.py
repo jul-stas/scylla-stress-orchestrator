@@ -63,6 +63,7 @@ class Scylla:
             ssh = self.__new_ssh(public_ip)
             ssh.exec("sudo systemctl start scylla-server")
             wait_for_cql_start(public_ip)
+            print("Node finished bootstrapping at:", datetime.now().strftime("%H:%M:%S"), public_ip)
         print(f"Starting Scylla nodes {self.cluster_public_ips}: done")
 
     def nodetool(self, command, load_index=None):
