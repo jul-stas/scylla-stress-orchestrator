@@ -36,14 +36,16 @@ loadgenerator_count = len(loadgenerator_public_ips)
 ROW_SIZE_BYTES = 210 * 1024 * 1024 * 1024 / 720_000_000
 
 # 1TB per node
-TARGET_DATASET_SIZE = len(cluster_private_ips) * 1024 * 1024 * 1024 * 1024
+#TARGET_DATASET_SIZE = len(cluster_private_ips) * 1024 * 1024 * 1024 * 1024
+TARGET_DATASET_SIZE = props['target_dataset_size_gb'] * 1024 * 1024 * 1024
 
 REPLICATION_FACTOR = 3
 COMPACTION_STRATEGY = props['compaction_strategy']
 ROW_COUNT = int(TARGET_DATASET_SIZE / ROW_SIZE_BYTES / REPLICATION_FACTOR)
 
-START_RATE     = 10000
-RATE_INCREMENT = 10000
+START_RATE     = props['start_rate'] #10000
+RATE_INCREMENT = props['rate_increment'] #10000
+DURATION_MINUTES = props['duration_minutes']
 
 MAX_90_PERCENTILE_LATENCY = 1000.0
 
@@ -52,13 +54,13 @@ READ_COUNT = props['read_count']
 
 # Start Scylla/Cassandra nodes
 if props['cluster_type'] == 'scylla':
-    s = Scylla(env['cluster_public_ips'], env['cluster_private_ips'], env['cluster_private_ips'][0], props)
-    s.install()
-    s.start()
+    cluster = Scylla(env['cluster_public_ips'], env['cluster_private_ips'], env['cluster_private_ips'][0], props)
+    cluster.install()
+    cluster.start()
 else:
-    cassandra = Cassandra(env['cluster_public_ips'], env['cluster_private_ips'], env['cluster_private_ips'][0], props)
-    cassandra.install()
-    cassandra.start()
+    cluster = Cassandra(env['cluster_public_ips'], env['cluster_private_ips'], env['cluster_private_ips'][0], props)
+    cluster.install()
+    cluster.start()
 
 print("Nodes started at:", datetime.now().strftime("%H:%M:%S"))
 
@@ -68,10 +70,15 @@ cs.prepare()
 
 print("Loading started at:", datetime.now().strftime("%H:%M:%S"))
 
-cs.stress_seq_range(ROW_COUNT, 'write cl=QUORUM', f'-schema "replication(strategy=SimpleStrategy,replication_factor={REPLICATION_FACTOR})" "compaction(strategy={COMPACTION_STRATEGY})" -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=700 throttle=33000/s" -node {cluster_string}')
+THROTTLE = (140000 // loadgenerator_count) if props['cluster_type'] == 'scylla' else (56000 // loadgenerator_count)
 
-print("Sleeping 2h")
-time.sleep(60 * 60 * 2)
+cs.stress_seq_range(ROW_COUNT, 'write cl=QUORUM', f'-schema "replication(strategy=SimpleStrategy,replication_factor={REPLICATION_FACTOR})" "compaction(strategy={COMPACTION_STRATEGY})" -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=700 throttle={THROTTLE}/s" -node {cluster_string}')
+
+cluster.nodetool("flush")
+
+confirm = input("Has compaction finished? Input 'yes':")
+while confirm != 'yes':
+    confirm = input("Has compaction finished? Input 'yes':")    
 
 print("Run started at:", datetime.now().strftime("%H:%M:%S"))
 
@@ -82,7 +89,7 @@ while True:
 
     iteration = Iteration(f'{profile_name}/cassandra-stress-{rate}', ignore_git=True)
 
-    cs.stress(f'mixed ratio\\(write={WRITE_COUNT},read={READ_COUNT}\\) duration=30m cl=QUORUM -pop dist=UNIFORM\\(1..{ROW_COUNT}\\) -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=700 fixed={rate // loadgenerator_count}/s" -node {cluster_string}')
+    cs.stress(f'mixed ratio\\(write={WRITE_COUNT},read={READ_COUNT}\\) duration={DURATION_MINUTES}m cl=QUORUM -pop dist=UNIFORM\\(1..{ROW_COUNT}\\) -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=500 fixed={rate // loadgenerator_count}/s" -node {cluster_string}')
 
     cs.collect_results(iteration.dir)
 

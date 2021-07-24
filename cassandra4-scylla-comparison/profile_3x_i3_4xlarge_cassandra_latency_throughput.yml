@@ -8,7 +8,7 @@ cluster_type: cassandra
 # Ubuntu 20.04 LTS
 cluster_user: ubuntu
 cluster_ami: ami-06382629a9eb569e3
-cassandra_version: 4.0-rc2
+cassandra_version: 4.0.0
 
 prometheus_instance_type: c5.large
 prometheus_ami: ami-0dd9f0e7df0f0a138
@@ -23,3 +23,8 @@ ssh_options: -i key -o StrictHostKeyChecking=no -o ConnectTimeout=60
 compaction_strategy: SizeTieredCompactionStrategy
 
 prometheus_user: ubuntu
+target_dataset_size_gb: 3000
+
+start_rate: 10000
+rate_increment: 10000
+duration_minutes: 30

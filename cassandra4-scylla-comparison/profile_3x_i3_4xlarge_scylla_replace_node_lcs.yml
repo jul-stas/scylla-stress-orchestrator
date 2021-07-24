@@ -22,3 +22,4 @@ ssh_options: -i key -o StrictHostKeyChecking=no -o ConnectTimeout=60
 compaction_strategy: LeveledCompactionStrategy
 
 prometheus_user: ubuntu
+target_dataset_size_gb: 3000

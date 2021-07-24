@@ -26,3 +26,8 @@ read_count: 0
 compaction_strategy: LeveledCompactionStrategy
 
 prometheus_user: ubuntu
+target_dataset_size_gb: 3000
+
+start_rate: 10000
+rate_increment: 10000
+duration_minutes: 30

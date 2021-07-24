@@ -45,7 +45,7 @@ class Cassandra:
                 exit 0
             fi
             
-            wget -q -N https://mirrors.netix.net/apache/cassandra/{self.cassandra_version}/apache-cassandra-{self.cassandra_version}-bin.tar.gz
+            wget -q -N https://dist.apache.org/repos/dist/dev/cassandra/{self.cassandra_version}/apache-cassandra-{self.cassandra_version}-bin.tar.gz
             tar -xzf apache-cassandra-{self.cassandra_version}-bin.tar.gz -C {path_prefix}
             
             wget -q https://github.com/criteo/cassandra_exporter/releases/download/2.3.5/cassandra_exporter-2.3.5.jar
