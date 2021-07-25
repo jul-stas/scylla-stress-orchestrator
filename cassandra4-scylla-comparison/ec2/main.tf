@@ -252,7 +252,7 @@ resource "aws_instance" "prometheus" {
   ebs_block_device {
       device_name = "/dev/sda1"
       volume_type = "gp3"
-      volume_size = 128
+      volume_size = 384
   }
 
   provisioner "remote-exec" {

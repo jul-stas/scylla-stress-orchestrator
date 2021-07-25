@@ -10,7 +10,7 @@ cluster_user: ubuntu
 cluster_ami: ami-06382629a9eb569e3
 cassandra_version: 4.0.0
 
-prometheus_instance_type: c5.large
+prometheus_instance_type: c5.4xlarge
 prometheus_ami: ami-0dd9f0e7df0f0a138
 
 loadgenerator_instance_type: c5n.9xlarge
