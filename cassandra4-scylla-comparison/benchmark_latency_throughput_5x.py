@@ -70,9 +70,9 @@ cs.prepare()
 
 print("Loading started at:", datetime.now().strftime("%H:%M:%S"))
 
-THROTTLE = (100000 * 5 // loadgenerator_count) if props['cluster_type'] == 'scylla' else (56000 * 5 // loadgenerator_count)
+THROTTLE = (100000 * 5 // loadgenerator_count) if props['cluster_type'] == 'scylla' else (56000 * 9 // loadgenerator_count)
 
-cs.stress_seq_range(ROW_COUNT, 'write cl=QUORUM', f'-schema "replication(strategy=SimpleStrategy,replication_factor={REPLICATION_FACTOR})" "compaction(strategy={COMPACTION_STRATEGY})" -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=700 throttle={THROTTLE}/s" -node {cluster_string}')
+cs.stress_seq_range(ROW_COUNT, 'write cl=QUORUM', f'-schema "replication(strategy=SimpleStrategy,replication_factor={REPLICATION_FACTOR})" "compaction(strategy={COMPACTION_STRATEGY})" -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 maxPending=1024 -rate "threads=700 throttle={THROTTLE}/s" -node {cluster_string}')
 
 cluster.nodetool("flush")
 
@@ -89,7 +89,7 @@ while True:
 
     iteration = Iteration(f'{profile_name}/cassandra-stress-{rate}', ignore_git=True)
 
-    cs.stress(f'mixed ratio\\(write={WRITE_COUNT},read={READ_COUNT}\\) duration={DURATION_MINUTES}m cl=QUORUM -pop dist=UNIFORM\\(1..{ROW_COUNT}\\) -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=500 fixed={rate // loadgenerator_count}/s" -node {cluster_string}')
+    cs.stress(f'mixed ratio\\(write={WRITE_COUNT},read={READ_COUNT}\\) duration={DURATION_MINUTES}m cl=QUORUM -pop dist=UNIFORM\\(1..{ROW_COUNT}\\) -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 maxPending=1024 -rate "threads=500 fixed={rate // loadgenerator_count}/s" -node {cluster_string}')
 
     cs.collect_results(iteration.dir)
 
