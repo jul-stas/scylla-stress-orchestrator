@@ -8,6 +8,9 @@ sys.path.insert(1, f"{os.environ['SSO']}/src/")
 import yaml
 from sso import terraform
 
+for i in range(50):
+    print("Pobierz metryki z Grafany !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
 if len(sys.argv) < 3:
 	raise Exception("provision-terraform TERRAFORM_PLAN PROFILE_NAME")
 else:
