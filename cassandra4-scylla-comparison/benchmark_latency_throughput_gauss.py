@@ -82,9 +82,8 @@ cs.stress_seq_range(ROW_COUNT, 'write cl=QUORUM', f'-schema "replication(strateg
 
 cluster.nodetool("flush")
 
-confirm = input("Has compaction finished? Input 'yes':")
-while confirm != 'yes':
-    confirm = input("Has compaction finished? Input 'yes':")    
+# Warm-up cache: 35k read/s for 180 minutes
+cs.stress(f'mixed ratio\\(write=0,read=1\\) duration=180m cl=QUORUM -pop dist=GAUSSIAN\\(1..{ROW_COUNT},{GAUSS_CENTER},{GAUSS_SIGMA}\\) -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=500 throttle=35000/s" -node {cluster_string}')
 
 print("Run started at:", datetime.now().strftime("%H:%M:%S"))
 
