@@ -65,6 +65,8 @@ if props['cluster_type'] == 'scylla':
 else:
     cluster = Cassandra(all_public_ips, all_private_ips, all_private_ips[0], props)
     cluster.install()
+    if "cassandra_extra_env_opts" in props:
+        cluster.append_env_configuration(props["cassandra_extra_env_opts"])
     cluster = Cassandra(cluster_public_ips, cluster_private_ips, cluster_private_ips[0], props)
     cluster.start()
 

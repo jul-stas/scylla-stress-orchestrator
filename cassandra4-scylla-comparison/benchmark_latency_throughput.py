@@ -60,6 +60,8 @@ if props['cluster_type'] == 'scylla':
 else:
     cluster = Cassandra(env['cluster_public_ips'], env['cluster_private_ips'], env['cluster_private_ips'][0], props)
     cluster.install()
+    if "cassandra_extra_env_opts" in props:
+        cluster.append_env_configuration(props["cassandra_extra_env_opts"])
     cluster.start()
 
 print("Nodes started at:", datetime.now().strftime("%H:%M:%S"))
