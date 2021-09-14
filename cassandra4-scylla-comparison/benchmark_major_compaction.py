@@ -41,8 +41,6 @@ REPLICATION_FACTOR = 3
 COMPACTION_STRATEGY = props['compaction_strategy']
 ROW_COUNT = int(TARGET_DATASET_SIZE / ROW_SIZE_BYTES / REPLICATION_FACTOR)
 
-BACKGROUND_LOAD_OPS = 10000
-
 # Start Scylla/Cassandra nodes
 if props['cluster_type'] == 'scylla':
     cluster = Scylla(env['cluster_public_ips'], env['cluster_private_ips'], env['cluster_private_ips'][0], props)
@@ -63,8 +61,7 @@ cs.prepare()
 
 print("Loading started at:", datetime.now().strftime("%H:%M:%S"))
 
-THROTTLE = (100000 // loadgenerator_count) if props['cluster_type'] == 'scylla' else (56000 // loadgenerator_count)
-
+THROTTLE = props["loading_total_throttle"] // loadgenerator_count
 cs.stress_seq_range(ROW_COUNT, 'write cl=QUORUM', f'-schema "replication(strategy=SimpleStrategy,replication_factor={REPLICATION_FACTOR})" "compaction(strategy={COMPACTION_STRATEGY})" -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 maxPending=1024 -rate "threads=300 throttle={THROTTLE}/s" -node {cluster_string}')
 
 cluster.nodetool("flush")
@@ -76,7 +73,8 @@ while confirm != 'yes':
 print("Run started at:", datetime.now().strftime("%H:%M:%S"))
 
 # Background load
-background_load = cs.loop_stress(f'mixed ratio\\(write=1,read=1\\) duration=5m cl=QUORUM -pop dist=UNIFORM\\(1..{ROW_COUNT}\\) -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=700 fixed={BACKGROUND_LOAD_OPS // loadgenerator_count}/s" -node {cluster_string}')
+BACKGROUND_LOAD_OPS = props["background_total_load_ops"] // loadgenerator_count
+background_load = cs.loop_stress(f'mixed ratio\\(write=1,read=1\\) duration=5m cl=QUORUM -pop dist=UNIFORM\\(1..{ROW_COUNT}\\) -log hdrfile=profile.hdr -graph file=report.html title=benchmark revision=benchmark-0 -mode native cql3 -rate "threads=700 fixed={BACKGROUND_LOAD_OPS}/s" -node {cluster_string}')
 
 iteration = Iteration(f'{profile_name}/compact', ignore_git=True)
 

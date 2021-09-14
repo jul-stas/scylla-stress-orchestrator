@@ -24,3 +24,9 @@ compaction_strategy: SizeTieredCompactionStrategy
 
 prometheus_user: ubuntu
 target_dataset_size_gb: 1000
+
+# Loading operations per second
+loading_total_throttle: 56000
+
+# Background operations per second
+background_total_load_ops: 10000
