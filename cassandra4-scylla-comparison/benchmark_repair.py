@@ -36,7 +36,7 @@ loadgenerator_count = len(loadgenerator_public_ips)
 ROW_SIZE_BYTES = 210 * 1024 * 1024 * 1024 / 720_000_000
 
 # 1TB per node
-TARGET_DATASET_SIZE = len(cluster_private_ips) * 1024 * 1024 * 1024 * 1024
+TARGET_DATASET_SIZE = props['target_dataset_size_gb'] * 1024 * 1024 * 1024
 
 REPLICATION_FACTOR = 3
 COMPACTION_STRATEGY = props['compaction_strategy']
