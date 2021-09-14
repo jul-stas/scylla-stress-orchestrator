@@ -2,7 +2,7 @@ region: us-east-2
 availability_zone: us-east-2c
 
 cluster_type: scylla
-cluster_size: 3
+cluster_size: 1
 cluster_instance_type: i3.4xlarge
 cluster_user: centos
 
@@ -22,4 +22,4 @@ ssh_options: -i key -o StrictHostKeyChecking=no -o ConnectTimeout=60
 compaction_strategy: SizeTieredCompactionStrategy
 
 prometheus_user: ubuntu
-target_dataset_size_gb: 3000
+target_dataset_size_gb: 1000
