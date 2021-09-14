@@ -15,7 +15,7 @@ class RAID:
         pssh = PSSH(self.public_ips, self.user, self.properties['ssh_options'])
         pssh.exec(f"""
             if [[ ! -b /dev/md/{self.raid_device_name} ]]; then
-                sudo mdadm --create --verbose /dev/md/{self.raid_device_name} --chunk=256 --metadata=1.2 --level={self.level} --raid-devices=$(ls {self.device_name_wildcard} | wc -l) {self.device_name_wildcard}
+                sudo mdadm --create --verbose /dev/md/{self.raid_device_name} --chunk=256 --metadata=1.2 --level={self.level} --force --raid-devices=$(ls {self.device_name_wildcard} | wc -l) {self.device_name_wildcard}
                 
                 # /dev/md/raid_device_name maps to /dev/md[0-9]+
                 MD_NAME=$(basename $(readlink /dev/md/{self.raid_device_name}))
